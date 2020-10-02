@@ -1,4 +1,5 @@
-Mango
+# Mango
+
 Mango es un lenguaje puramente funcional, fuertemente tipado, con datos inmutables, y con evaluación perezosa. Su sintaxis está principalmente basada en lisp, por lo que no hay ambigüedad léxica. Sin embargo, muchas de sus funcionalidades, como el tipado, los datos, y las clases están inspiradas en Haskell.
 
 Antes de continuar, como todo buen tutorial de un lenguaje de programación, mostramos un Hello World hecho con Mango.
