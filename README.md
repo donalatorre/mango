@@ -2,7 +2,18 @@
 
 Mango es un lenguaje puramente funcional, fuertemente tipado, con datos inmutables, y con evaluación perezosa. Su sintaxis está principalmente basada en lisp, por lo que no hay ambigüedad léxica. Sin embargo, muchas de sus funcionalidades, como el tipado, los datos, y las clases están inspiradas en Haskell.
 
-Antes de continuar, como todo buen tutorial de un lenguaje de programación, mostramos un Hello World hecho con Mango.
+## Cómo correrlo
+Prerequisitos: Tener haskell instalado (cabal, stack, ghc). Haga click [aquí](https://www.haskell.org/platform/) para saber cómo.
+1. Clone o descargue este repositorio.
+2. Corra `cabal install` para instalar las dependencias necesarias.
+3. Cree un archivo (llamémosle `main.mgo`), ahí ponga el código en Mango que desee compilar.
+4. Corra `stack run -- "main.mgo"`.
+
+**NOTA**: El proyecto no está completo. Por ahora sólo está hecha la parte del lexer. Por lo tanto, el resultado de correr el compilador es un AST con los elementos del programa.
+
+## Cómo codificar en Mango
+
+Antes de empezar, como todo buen tutorial de un lenguaje de programación, mostramos un Hello World hecho con Mango.
 
 ```
 (print "Hello World!")
