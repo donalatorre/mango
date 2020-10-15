@@ -302,8 +302,8 @@ True
 ```
 La logica de clases e instancias es la misma que la de Haskell.
 
-##
-Avance del Proyecto
+
+### Avance del Proyecto
 
 Este proyecto tiene como objetivo desarrollar el compilador de Mango de tal forma que todas las instrucciones anteriormente mencionadas, puedan ser ejecutadas correcta y eficientemente. Hay varios milestones en el plan de desarrollo. Actualmente se han cubierto los dos primeros los cuales son el Scanner-Parser y la semántica básica. A continuación se explica brevemente en que consisten estos milestones.
 
