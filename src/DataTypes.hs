@@ -1,5 +1,8 @@
 module DataTypes where
 
+primitiveTypes :: [String]
+primitiveTypes = ["Int", "String", "Double", "Char"]
+
 data TypeSig = TypeRef String | TypeList [TypeSig] | TypeConstr String [TypeSig] deriving (Show)
 data TypeDef = TypeDef (String, [String]) [TypeSig] deriving (Show)
 data ClassDef = ClassDef (String, [String]) [(String, TypeSig)] deriving (Show)
