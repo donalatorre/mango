@@ -1,8 +1,11 @@
 module VarTable  where
 import DataTypes
 
+builtInFuntions :: [(String, Int)]
+builtInFuntions = [("if", 3)]
+
 varTable :: Program -> [(String, Int)]
-varTable (Program typeDefList _ _ _ _) = typeDefVars typeDefList (getTypes typeDefList)
+varTable (Program typeDefList _ _ bindList _) = builtInFuntions ++ typeDefVars typeDefList (getTypes typeDefList) ++ bindVars bindList
 
 getTypes :: [TypeDef] -> [String]
 getTypes [] = []
@@ -22,3 +25,7 @@ countPrimitiveTypes ((TypeConstr primitiveType _): t) newTypes=
 	if elem primitiveType primitiveTypes || elem primitiveType newTypes
 		then 1 + countPrimitiveTypes t newTypes
 		else error ("Error, " ++ primitiveType ++ " is not a primitive type")
+
+bindVars :: [Bind] -> [(String, Int)]
+bindVars [] = []
+bindVars ((BindVal varName _): t) = ((varName, 0): bindVars t)
