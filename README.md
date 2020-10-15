@@ -301,3 +301,12 @@ False
 True
 ```
 La logica de clases e instancias es la misma que la de Haskell.
+
+##
+Avance del Proyecto
+
+Este proyecto tiene como objetivo desarrollar el compilador de Mango de tal forma que todas las instrucciones anteriormente mencionadas, puedan ser ejecutadas correcta y eficientemente. Hay varios milestones en el plan de desarrollo. Actualmente se han cubierto los dos primeros los cuales son el Scanner-Parser y la semántica básica. A continuación se explica brevemente en que consisten estos milestones.
+
+El Scanner-Parser es la primera fase de cualquier compilador. El programa es capaz de leer cualquier secuencia de instrucciones permitidas en Mango. Además se reconocen los tokens y se crean las estructuras permitidas por el lenguaje. En caso de encontrar alguna inconsistencia, el compilador es capaz de identificarla e informar al programador acerca de ella. Cuando el programa es aceptado, se genera una estructura con los tokens reconocidos.
+
+El último avance agregado al compilador, es la capacidad de crear una tabla de variables en la cual se guardan los nombres de las variables o datos declarados, junto con su aridad. Esto forma la semántica básica del lenguaje de tal forma que se reconoce cuando los tipos no son primitivos ni creados por el programador. En próximas entregas se planea modificar esta parte del proyecto a como sea necesario para optimizar la información en la tabla de variables.
