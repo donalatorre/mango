@@ -1,4 +1,5 @@
 module Lexer (mylex) where
+import DataTypes
 import Text.ParserCombinators.Parsec hiding (spaces)
 import Control.Monad
 import qualified Control.Exception as E
@@ -40,21 +41,6 @@ abstractList parseItem = do
  list <- (sepEndBy parseItem $ (char ',' >> skipMany blank))
  char ']'
  return list
-
-data TypeSig = TypeRef String | TypeList [TypeSig] | TypeConstr String [TypeSig] deriving (Show)
-data TypeDef = TypeDef (String, [String]) [TypeSig] deriving (Show)
-data ClassDef = ClassDef (String, [String]) [(String, TypeSig)] deriving (Show)
-data ClassInst = ClassInst (String, [TypeSig]) [Bind] deriving (Show)
-data Prim = PBool Bool | PInt Int | PDouble Double | PString String | PChar Char deriving (Show)
-data Bind = BindVal String [Value] | BindType (String, TypeSig) [(String, [String])] deriving (Show) -- TODO: enable type constraints
-data Pattern = PatLit Prim | PatConstr String [Pattern] | PatList [Pattern] | PatRef String deriving (Show)
-data Value = ValLit Prim
- | ValConstr String [Value]
- | ValCall String [Value]
- | ValList [Value]
- | ValLambda ([Pattern], Value) [Bind] deriving (Show)
-
-data Program = Program [TypeDef] [ClassDef] [ClassInst] [Bind] [[Value]] deriving (Show) -- Value list is for prints
 
 parseProgram :: Program->Parser Program
 parseProgram prog@(Program tdl cdl cil bl vll) = (try parseProgItem) <|> ((many blank >> eof) *> ( return prog ))
@@ -152,4 +138,3 @@ mylex input =
  case parse (many blank >> (parseProgram $ Program [] [] [] [] [])) "lexer" input of
  Left err->Left $ "Lexing error:\n" ++ (show err)
  Right val-> Right val
-
