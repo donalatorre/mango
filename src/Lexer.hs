@@ -1,9 +1,15 @@
 module Lexer (mylex) where
+import Typing
 import DataTypes
 import Text.ParserCombinators.Parsec hiding (spaces)
 import Control.Monad
 import qualified Control.Exception as E
 import Data.Char
+
+myl = []
+
+uno = (1: myl)
+dos = ("str": myl)
 
 blank = oneOf " \t\n"
 

@@ -4,19 +4,24 @@ import Lexer (mylex)
 import VarTable
 import Text.Show.Pretty (ppShow)
 import qualified Control.Exception as E
+import Typing
+import Control.Monad.State.Lazy
+import DataTypes
 
-data Data = Cns String Int
-
-myint :: Int
-myint = 3
-
-compile :: String->String
+compile :: String->Program
 compile input = case mylex input of
- Left err->("Compiling failed:\n" ++ err)
- Right val->("Compilation successful!\nResult:\n" ++ (ppShow val) ++ "\nVariable Table\n" ++ (ppShow (varTable val)))
+ Left err->error("Compiling failed:\n" ++ err)
+ Right val->val
 
 main :: IO ()
 main = do
  args <- getArgs
  s <- readFile $ args !! 0
- putStrLn (compile s)
+ let compiled = compile s
+ putStrLn ("=============================================================================================")
+ putStrLn ("\nParsing successful!\nResult:\n\n"++ (ppShow compiled))
+ let (Program _ _ _ bds _) = compiled
+ let (typed, _) = runState (runTypeInference bds) initialState
+ putStrLn ("=============================================================================================")
+ putStrLn ("\nTyping successful!\nResult:\n\n"++ (ppShow typed))
+ putStrLn ("=============================================================================================")

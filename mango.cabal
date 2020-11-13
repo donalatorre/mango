@@ -29,13 +29,18 @@ library
   exposed-modules:
       Lib
       Lexer
+      DataTypes
+      VarTable
+      Typing
   other-modules:
       Paths_mango
   hs-source-dirs:
       src
   build-depends:
       base >=4.7 && <5,
-      parsec >= 3
+      parsec >= 3,
+      mtl >= 2,
+      containers >= 0
   default-language: Haskell2010
 
 executable mango-exe
@@ -49,6 +54,7 @@ executable mango-exe
       base >=4.7 && <5
     , mango
     , pretty-show >= 1
+    , mtl >= 2
   default-language: Haskell2010
 
 test-suite mango-test

@@ -1,0 +1,7 @@
+
+(let ff
+  (\ [a, b] [a, b])
+)
+
+(let otr (ff 1 "str"))
+

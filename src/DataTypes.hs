@@ -17,3 +17,6 @@ data Value = ValLit Prim
  | ValLambda ([Pattern], Value) [Bind] deriving (Show)
 
 data Program = Program [TypeDef] [ClassDef] [ClassInst] [Bind] [[Value]] deriving (Show) -- Value list is for prints
+
+
+
