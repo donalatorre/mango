@@ -1,7 +1,9 @@
 
-(let ff
-  (\ [a, b] [a, b])
-)
+(let id (\ [x] x))
 
-(let otr (ff 1 "str"))
+(let suma (\ [a, b] (+ (id a) (id b))))
+
+(print (+ (id 3) (id 5)))
+(print (id "f"))
+(print (suma 2.0 2.0))
 

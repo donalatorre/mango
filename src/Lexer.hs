@@ -6,11 +6,6 @@ import Control.Monad
 import qualified Control.Exception as E
 import Data.Char
 
-myl = []
-
-uno = (1: myl)
-dos = ("str": myl)
-
 blank = oneOf " \t\n"
 
 nameChar :: Parser Char
@@ -84,14 +79,14 @@ parseClassDef = liftM ($ClassDef) $ strictApply parseHead parseFunc
   parseHead = string "class" >> many1 blank >> (liftM ($(,)) $ strictApply parseUpper parseNonUpper)
 
 parsePattern :: Parser Pattern
-parsePattern = parseConstr <|> parseList <|> parseLit <|> (liftM PatRef parseNonUpper)
+parsePattern = parseLit <|> parseConstr <|> parseList <|> (liftM PatRef parseNonUpper)
  where
   parseConstr = liftM ($PatConstr) $ flexibleApply parseUpper parsePattern
   parseList = liftM PatList $ abstractList parsePattern
   parseLit = liftM PatLit $ parsePrim
 
 parseValue :: Parser Value
-parseValue = (try parseConstr) <|> parseList <|> (try parseLambda) <|> parseLit <|> parseCall
+parseValue = (try parseLit) <|> (try parseConstr) <|> parseList <|> (try parseLambda) <|> parseCall
  where
   parseLit = liftM ValLit parsePrim
   parseConstr = liftM ($ValConstr) $ flexibleApply parseUpper parseValue

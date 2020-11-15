@@ -18,5 +18,3 @@ data Value = ValLit Prim
 
 data Program = Program [TypeDef] [ClassDef] [ClassInst] [Bind] [[Value]] deriving (Show) -- Value list is for prints
 
-
-

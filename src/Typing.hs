@@ -16,6 +16,7 @@ data TValue = TValLit Prim Type
 
 data Type = TConstr String [Type] | TVar Int | TArg Int | TInst Type Type deriving (Show)
 
+
 class Typed a where
  getType :: a -> State InferState Type
 
@@ -27,7 +28,7 @@ instance Typed TPattern where
 instance Typed TValue where
  getType (TValLit _ tp) = find tp
  getType (TValConstr _ _ tp) = find tp
- getType (TValCall _ _ (TInst tp _)) = find tp
+ getType (TValCall _ _ (TInst _ tp)) = find tp
  getType (TValCall _ _ otr) = find otr
  getType (TValList _ tp) = find tp
  getType (TValLambda _ _ _ tp) = find tp
@@ -108,6 +109,10 @@ newMetaVar = do
  modify (\s -> s {store = insert v (TVar v) (store s), var_count = v + 1})
  return $ TVar v
 
+destructFun :: Type->[Type]->Type
+destructFun typ [] = typ
+destructFun (TConstr "TFun" [_, body]) (_: rest) = destructFun body rest
+
 typeCall :: [Type]->Type
 typeCall [] = error "Empty list"
 typeCall [x] = x
@@ -137,7 +142,7 @@ typeVal (ValCall name args) = do
    onlyTypes <- mapM getType typedArgs
    let funcd = typeCall (onlyTypes++[ret])
    unified <- unify vr funcd
-   return unified 
+   return $ destructFun unified onlyTypes
 
 typeVal (ValLambda (args, ret) _) = do
  oldCtx <- context <$> get
@@ -226,19 +231,10 @@ unifyVal (TValCall name args typ) = do
    modify (\s -> s {specMap = empty})
    newPar <- find par
    newSon <- find son
-   specifiedSon <- specifyCall newPar argTypes newSon
+   specifiedFun <- specify newPar $ typeCall (argTypes++[newSon])
+   let specifiedSon = destructFun specifiedFun argTypes
    modify (\s -> s {specMap = empty})
    return $ TInst newPar specifiedSon
-  specifyCall :: Type->[Type]->Type->State InferState Type
-  specifyCall par [] sonBody = specify par sonBody
-  specifyCall par (sonArg: sonTail) sonBody = do
-   ret <- (case par of 
-    TConstr "TFun" [parArg, parTail] -> do 
-     specify parArg sonArg
-     newTail <- specifyCall parTail sonTail sonBody
-     return newTail
-    _-> error ("Call to '"++name++"' is invalid. Too many arguments were sent."))
-   return ret
 
 unifyBindList :: [TBind]->State InferState [TBind]
 unifyBindList lst = mapM unifyBind lst
@@ -260,7 +256,7 @@ runTypeInference bds = do
  return f
 
 initialState :: InferState
-initialState = InferState empty empty 0 empty
+initialState = InferState (fromList [(0, TVar 0)]) (fromList globalCtx) 1 empty
 
 headTyp = TConstr "TFun" [TConstr "List" [TVar 0], TVar 0]
 headCall = TConstr "TFun" [TConstr "List" [TVar 1], TVar 2]
@@ -275,3 +271,23 @@ myCall = (ValCall "+" [ValLit $ PInt 2, ValLit $ PInt 3])
 myLamb = ValLambda ([PatRef "a", PatRef "b"], ValCall "c" []) []
 --vlu wh init = runState (typeVal wh) init
 
+tFun a b = TConstr "TFun" [a, b]
+tBool = TConstr "Bool" []
+tInt = TConstr "Int" []
+tDouble = TConstr "Double" []
+tString = TConstr "String" []
+
+
+tBinArith tp = tFun tp (tFun tp tp)
+
+arithmetic = [
+ ("+", tBinArith tInt),
+ ("-", tBinArith tInt),
+ ("*", tBinArith tInt),
+ ("/", tBinArith tInt)]
+
+basicLib = [
+ ("if", tFun tBool $ tFun (TVar 0) $ tFun (TVar 0) (TVar 0)),
+ ("++", tFun tString $ tFun tString tString)]
+
+globalCtx = arithmetic ++ basicLib
