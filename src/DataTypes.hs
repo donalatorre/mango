@@ -8,7 +8,7 @@ data TypeDef = TypeDef (String, [String]) [TypeSig] deriving (Show)
 data ClassDef = ClassDef (String, [String]) [(String, TypeSig)] deriving (Show)
 data ClassInst = ClassInst (String, [TypeSig]) [Bind] deriving (Show)
 data Prim = PBool Bool | PInt Int | PDouble Double | PString String | PChar Char deriving (Show)
-data Bind = BindVal String [Value] | BindType (String, TypeSig) [(String, [String])] deriving (Show) -- TODO: enable type constraints
+data Bind = BindVal Pattern [Value] | BindType (String, TypeSig) [(String, [String])] deriving (Show) -- TODO: enable type constraints
 data Pattern = PatLit Prim | PatConstr String [Pattern] | PatList [Pattern] | PatRef String deriving (Show)
 data Value = ValLit Prim
  | ValConstr String [Value]

@@ -197,7 +197,7 @@ typeBindList lst = do
    return ()
   storeBind (BindVal name _) = do
    -- TODO: change name from string to pattern
-   pat <- typePattern False (PatRef name)
+   pat <- typePattern False name
    return pat
   typeBody (BindVal _ body) = do
    typedBody <- mapM typeVal body
@@ -265,7 +265,7 @@ headStore = InferState (fromList [(0, TVar 0), (1, TVar 1), (2, TVar 2)]) empty 
 otrStore = InferState (fromList [(0, TVar 0), (1, TVar 1), (2, TVar 2)]) empty 0 $ fromList [(0, TVar 1)]
 otrTyp = TVar 0
 otrCall = TVar 2
-bv = BindVal "x" [ ValLit (PInt 3) ]
+bv = BindVal (PatRef "x") [ ValLit (PInt 3) ]
 
 myCall = (ValCall "+" [ValLit $ PInt 2, ValLit $ PInt 3])
 myLamb = ValLambda ([PatRef "a", PatRef "b"], ValCall "c" []) []
