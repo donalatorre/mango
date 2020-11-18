@@ -7,6 +7,7 @@ import qualified Control.Exception as E
 import Typing
 import Control.Monad.State.Lazy
 import DataTypes
+import Eval
 
 compile :: String->Program
 compile input = case mylex input of
@@ -16,6 +17,7 @@ compile input = case mylex input of
 main :: IO ()
 main = do
  args <- getArgs
+ let (x:xs) = args
  s <- readFile $ args !! 0
  let compiled = compile s
  putStrLn ("=============================================================================================")
