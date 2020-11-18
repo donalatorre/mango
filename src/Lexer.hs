@@ -100,7 +100,7 @@ parseLmbHead = do
  return (args, body)
 
 parseBindVal :: Parser Bind
-parseBindVal = liftM ($BindVal) $ strictApply (string "let" >> many1 blank >> parseNonUpper) parseValue
+parseBindVal = liftM ($BindVal) $ strictApply (string "let" >> many1 blank >> parsePattern) parseValue
 
 parseBind :: Parser Bind
 parseBind = (try parseBindVal) <|> parseBindType

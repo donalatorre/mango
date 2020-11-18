@@ -7,3 +7,4 @@
 (print (id "f"))
 (print (suma 2.0 2.0))
 
+(let (Cons x xs) [1, 2, 3])
