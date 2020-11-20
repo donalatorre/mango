@@ -54,7 +54,25 @@ parseProgram prog@(Program tdl cdl cil bl vll) = (try parseProgItem) <|> ((many 
   parseProgClassDef = try $ liftM (\cd -> Program tdl (cd:cdl) cil bl vll) parseClassDef
   parseProgClassInst = try $ liftM (\ci -> Program tdl cdl (ci:cil) bl vll) parseClassInst
   parseProgBind = try $ liftM (\b -> Program tdl cdl cil (b:bl) vll) parseBind
-  parseProgMain = try $ liftM ($(\_ vl-> Program tdl cdl cil bl (vll++[vl]))) $ strictApply (string "print") parseValue
+  parseProgMain = try $ liftM ($(\_ vl-> case vll of
+   Nothing -> Program tdl cdl cil bl (Just vl) 
+   _ -> error "Multiple main declarations")) $ strictApply (string "main") parseAction
+
+parseAction :: Parser Action
+parseAction = (try parseRead) <|> (try parsePrint) <|> parseAssign
+
+parsePrint :: Parser Action
+parsePrint = try $ liftM ($(\_ pv -> Print pv)) $strictApply (string "print") parseValue
+
+parseRead :: Parser Action
+parseRead = do 
+  char '(' >> many blank >> string "read" >>many blank
+  res <- liftM Read parseNonUpper
+  many blank>>char ')'
+  return res
+
+parseAssign :: Parser Action
+parseAssign = liftM ($Assign) $ strictApply (string "var" >> many1 blank >> parsePattern) parseValue
 
 parseClassInst :: Parser ClassInst
 parseClassInst = liftM ($ClassInst) $ strictApply parseInstHead parseBindVal
@@ -136,6 +154,7 @@ prsl = liftM ($(,)) $ flexibleApply parseUpper parseUpper
 
 mylex :: String->(Either String Program)
 mylex input =
- case parse (many blank >> (parseProgram $ Program [] [] [] [] [])) "lexer" input of
+ case parse (many blank >> (parseProgram $ Program [] [] [] [] Nothing)) "lexer" input of
  Left err->Left $ "Lexing error:\n" ++ (show err)
- Right val-> Right val
+ Right (Program _ _ _ _ Nothing)-> Left "There is not main function"
+ Right val -> Right val
