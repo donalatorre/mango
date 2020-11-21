@@ -65,11 +65,7 @@ parsePrint :: Parser Action
 parsePrint = try $ liftM ($(\_ pv -> Print pv)) $strictApply (string "print") parseValue
 
 parseRead :: Parser Action
-parseRead = do 
-  char '(' >> many blank >> string "read" >>many blank
-  res <- liftM Read parseNonUpper
-  many blank>>char ')'
-  return res
+parseRead = try $ liftM ($(\_ name -> Read name)) $singleApply (string "read") parseNonUpper
 
 parseAssign :: Parser Action
 parseAssign = liftM ($Assign) $ strictApply (string "var" >> many1 blank >> parsePattern) parseValue
