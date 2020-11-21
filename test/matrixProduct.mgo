@@ -1,0 +1,35 @@
+(:: transpose [[a], [a]])
+(let transpose
+	(\ [(Cons [] _)] [])
+	(\ x (Cons (map head x) (transpose (map tail x))))
+)
+
+(:: sacalarProd [[a], [a], a])
+(let scalarProd
+	(\ [[], []] 0)
+	(\ [(Cons x xs), (Cons y ys)] (+ (* x y) (scalarProd xs ys)))
+)
+
+(:: getRow [[a], [[a]], [a]])
+(let getRow
+	(\ [_, []] [])
+	(\ [row, (Cons x xs)] (Cons (scalarProd row x) (getRow row xs)))
+)
+
+(:: matProdAux [[[a]], [[a]], [[a]]])
+(let matProdAux
+	(\ [[], _] [])
+	(\ [(Cons row rest), b] (Cons (getRow row b) (matProdAux rest b)))
+)
+
+(:: matProd [[[a]], [[a]], [[a]]])
+(let matProd
+	(\ [a, b] (matProdAux a (transpose b)))
+)
+
+(main
+	(read m1)
+	(read m2)
+	(var res (matProd m1 m2))
+	(print res)
+)

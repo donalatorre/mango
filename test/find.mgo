@@ -1,0 +1,12 @@
+(:: find [a, [a], Int, Int])
+(let find
+	(\ [_, [], _] -1)
+	(\ [value, (Cons x xs), index] if (value == x)  index (find value xs (+ index 1)))
+)
+
+(main
+	(read list)
+	(read value)
+	(var res (find value list 0))
+	(print res)
+)

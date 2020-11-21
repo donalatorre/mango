@@ -1,0 +1,12 @@
+(:: fibonacci [Int, Int])
+(let fibonacci
+	(\ [0] 1)
+	(\ [1] 1)
+	(\ [n] (+ (fibonacci (- n 1)) (fibonacci (- n 2))))
+)
+
+(main
+	(read x)
+	(var res (fibonacci x))
+	(print x)
+)
