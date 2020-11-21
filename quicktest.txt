@@ -1,9 +1,7 @@
+(let id 4)
 
-(let id (\ [x] x))
-
-(let suma (\ [a, b] (+ (id a) (id b))))
-
-(print (+ (id 3) (id 5)))
-(print (id "f"))
-(print (suma 2.0 2.0))
-
+(main
+	(read x)
+	(print 2)
+	(var x 4)
+)
