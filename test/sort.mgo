@@ -1,0 +1,17 @@
+(:: insert [a, [a], [a]])
+(let insert
+	(\ [value, []] [value])
+	(\ [value, (Cons x xs)] if (value <= x)  (Cons value (Cons x xs)) (Cons x (insert value xs)))
+)
+
+(:: sort [[a], [a]])
+(let sort
+	(\ [[]] [])
+	(\ [(Cons x xs)] (insert x (sort xs)))
+)
+
+(main
+	(read x)
+	(var res (sort x))
+	(print res)
+)
