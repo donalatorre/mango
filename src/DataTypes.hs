@@ -10,7 +10,7 @@ data ClassInst = ClassInst (String, [TypeSig]) [Bind] deriving (Show)
 data Prim = PBool Bool | PInt Int | PDouble Double | PString String | PChar Char deriving (Show)
 data Bind = BindVal Pattern [Value] | BindType (String, TypeSig) [(String, [String])] deriving (Show) -- TODO: enable type constraints
 data Pattern = PatLit Prim | PatConstr String [Pattern] | PatList [Pattern] | PatRef String deriving (Show)
-data Action = Assign Pattern [Value]  | Print [Value] | Read String deriving (Show)
+data Action = Assign Pattern [Value] | Print [Value] | Read String deriving (Show)
 data Value = ValLit Prim
  | ValConstr String [Value]
  | ValCall String [Value]

@@ -1,7 +1,4 @@
-(let id 4)
-
 (main
-	(read x)
-	(print 2)
-	(var x 4)
+	(print (if True 2 3))
 )
+

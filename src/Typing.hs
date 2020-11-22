@@ -7,12 +7,14 @@ import Data.Map
 import Control.Monad
 
 data TBind = TBindVal TPattern [TValue] deriving (Show) -- TODO: enable type constraints
-data TPattern = TPatLit Prim Type | TPatConstr String [Pattern] Type | TPatList [Pattern] Type | TPatRef String Type deriving (Show)
+data TPattern = TPatLit Prim Type | TPatConstr String [TPattern] Type | TPatList [Pattern] Type | TPatRef String Type deriving (Show)
 data TValue = TValLit Prim Type
  | TValConstr String [TValue] Type
  | TValCall String [TValue] Type
  | TValList [TValue] Type
  | TValLambda [TPattern] TValue [TBind] Type deriving (Show)
+data TAction = TAssign TPattern [TValue] | TPrint [TValue] | TRead String deriving (Show)
+data TProgram = TProgram [TBind] [TAction] deriving (Show)
 
 data Type = TConstr String [Type] | TVar Int | TArg Int | TInst Type Type deriving (Show)
 
@@ -184,7 +186,8 @@ typeBindList lst = do
  zipWithM unifyWithPattern storedBinds typedBodies
  let ret = zipWith TBindVal storedBinds typedBodies
  -- Go back to old context before leaving
- modify (\s -> s { context = oldCtx })
+ -- If we add subcontexts, we have to uncomment the next line
+ -- modify (\s -> s { context = oldCtx })
  return ret
  where
   typeBody :: Bind->State InferState [TValue]
@@ -202,6 +205,20 @@ typeBindList lst = do
   typeBody (BindVal _ body) = do
    typedBody <- mapM typeVal body
    return typedBody
+
+typeAction :: Action->State InferState TAction
+typeAction (Assign ptrn vlus) = do
+ tPtrn <- ((typePattern True) >=> unifyPattern) ptrn
+ tVlus <- mapM (typeVal >=> unifyVal) vlus
+ return $ TAssign tPtrn tVlus
+typeAction (Print vlus) = do
+ tVlus <- mapM (typeVal >=> unifyVal) vlus
+ return $ TPrint tVlus
+typeAction (Read rd) = do
+ ctx <- context <$> get
+ if Data.Map.member rd ctx then error ("Variable '"++rd++"' already exists") else do
+  modify (\s->s{ context = insert rd (TConstr "String" []) (context s) })
+  return $ TRead rd
 
 unifyPattern :: TPattern->State InferState TPattern
 unifyPattern (TPatRef name typ) = do
@@ -244,8 +261,8 @@ unifyBindList lst = mapM unifyBind lst
    unifiedArgs <- mapM unifyVal args
    return $ TBindVal unifiedName unifiedArgs
 
-runTypeInference :: [Bind]->State InferState [TBind]
-runTypeInference bds = do
+typeBindGroup :: [Bind]->State InferState [TBind]
+typeBindGroup bds = do
  initial <- typeBindList bds
  a <- unifyBindList initial
  b <- unifyBindList a
@@ -254,6 +271,15 @@ runTypeInference bds = do
  e <- unifyBindList d
  f <- unifyBindList e
  return f
+
+typeProgram :: Program->TProgram
+typeProgram (Program _ _ _ binds (Just actions)) = typed
+ where
+  (typed, _) = runState runTypeInference initialState
+  runTypeInference = do
+   tBinds <- typeBindGroup binds
+   tActions <- mapM typeAction actions
+   return $ TProgram tBinds tActions
 
 initialState :: InferState
 initialState = InferState (fromList [(0, TVar 0)]) (fromList globalCtx) 1 empty

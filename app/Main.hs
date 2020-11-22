@@ -20,10 +20,13 @@ main = do
  let (x:xs) = args
  s <- readFile $ args !! 0
  let compiled = compile s
+ let x = 1
  putStrLn ("=============================================================================================")
  putStrLn ("\nParsing successful!\nResult:\n\n"++ (ppShow compiled))
- let (Program _ _ _ bds _) = compiled
- let (typed, _) = runState (runTypeInference bds) initialState
+ let typed = typeProgram compiled
  putStrLn ("=============================================================================================")
  putStrLn ("\nTyping successful!\nResult:\n\n"++ (ppShow typed))
  putStrLn ("=============================================================================================")
+ putStrLn ("=============================================================================================")
+ putStrLn ("\nRUNNING PROGRAM:")
+ resolveProgram typed
