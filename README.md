@@ -10,6 +10,11 @@ Prerequisitos: Tener haskell instalado (cabal, stack, ghc). Haga click [aquí](h
 4. Corra `stack run -- "main.mgo"`.
 
 **NOTA**: El proyecto no está completo. Por ahora sólo está hecha la parte del lexer. Por lo tanto, el resultado de correr el compilador es un AST con los elementos del programa.
+**UPDATE**: El proyecto ya tiene:
+- Soportada una función main.
+- Soportado pattern matching básico.
+- Recursividad básica.
+- Ejecución básica con operaciones aritméticas.
 
 ## Cómo codificar en Mango
 
