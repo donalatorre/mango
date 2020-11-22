@@ -3,6 +3,7 @@ import DataTypes
 import Data.Map
 import Typing
 import Control.Monad
+import Text.Show.Pretty (ppShow)
 
 data Func = PrimFunc String -- primitive function's name
  | Func [([TPattern], TValue)] deriving(Show)
@@ -50,8 +51,9 @@ patternListMatch _ _ = NoMatch
 
 handleMultiDef :: [Data]->Data
 handleMultiDef [x] = x
-handleMultiDef (DataCall (Func lsta) [] 0: DataCall (Func lstb) [] 0: rest) = 
- handleMultiDef (DataCall (Func $ lsta++lstb) [] 0: rest)
+handleMultiDef (DataCall (Func lsta) [] argcA: DataCall (Func lstb) [] argcB: rest) = if argcA == argcB then
+ handleMultiDef (DataCall (Func $ lsta++lstb) [] argcA: rest) else error $ "Fatal error: Different number of args"
+handleMultiDef x = error $ "x is " ++ (ppShow x)
 
 resolveBind :: Map String Data->TBind->Map String Data
 resolveBind ctx (TBindVal pat vls) = case matched of
@@ -130,5 +132,5 @@ evaluate a b lst = evaluate' a b (reverse lst)
     tryEval [] = error "Non-exhaustive function"
     tryEval ((ptrns, ret):xs) = case patternListMatch revArgs ptrns of
      NoMatch-> tryEval xs
-     Match lcl -> resolve (union mp lcl) ret
+     Match lcl -> resolve (union lcl mp) ret
 

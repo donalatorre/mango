@@ -1,11 +1,8 @@
-(:: factorial [Int, Int])
 (let factorial
 	(\ [0] 1)
 	(\ [n] (* (factorial (- n 1)) n))
 )
 
 (main
-	(read x)
-	(var res (factorial x))
-	(print x)
+	(print (factorial 4))
 )

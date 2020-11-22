@@ -120,14 +120,15 @@ typeCall [] = error "Empty list"
 typeCall [x] = x
 typeCall (x: xs) = TConstr "TFun" [x, typeCall xs]
 
-typeVal :: Value->State InferState TValue
-typeVal (ValLit prm) = pure $ TValLit prm $ TConstr (case prm of
+typePrim prm = TConstr (case prm of
  PBool _ -> "Bool"
  PInt _ -> "Int"
  PDouble _ -> "Double"
  PString _ -> "String"
  PChar _ -> "Char") []
 
+typeVal :: Value->State InferState TValue
+typeVal (ValLit prm) = pure $ TValLit prm $ typePrim prm
 typeVal (ValCall name args) = do
  ctx <- context <$> get
  let rawPrnt = Data.Map.lookup name ctx
@@ -176,6 +177,7 @@ typePattern isArg (PatRef name) = do
    let (TVar id) = vr
    modify (\s -> s { context = insert name (if isArg then TArg id else vr) ctx })
    return $ TPatRef name vr
+typePattern _ (PatLit prm) = pure $ TPatLit prm $ typePrim prm
 
 typeBindList :: [Bind]->State InferState [TBind]
 typeBindList lst = do
@@ -224,6 +226,7 @@ unifyPattern :: TPattern->State InferState TPattern
 unifyPattern (TPatRef name typ) = do
  newTyp <- find typ
  return $ TPatRef name newTyp
+unifyPattern x@(TPatLit _ _) = pure x
 
 unifyVal :: TValue->State InferState TValue
 unifyVal x@(TValLit _ _) = pure x
