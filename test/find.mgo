@@ -1,12 +1,12 @@
-(:: find [a, [a], Int, Int])
 (let find
-	(\ [_, [], _] -1)
-	(\ [value, (Cons x xs), index] if (== value x)  index (find value xs (+ index 1)))
+  (\ [_, [], _] -1)
+  (\ [value, (Cons x xs), index] (if (== value x) index (find value xs (+ index 1))))
 )
 
 (main
-	(read list)
-	(read value)
-	(var res (find value list 0))
-	(print res)
+  (var value 60)
+  (var list [10, 20, 30, 40, 50, 60])
+  (var res (find value list 0))
+  (print res)
 )
+

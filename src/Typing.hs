@@ -175,9 +175,31 @@ typePattern isArg (PatRef name) = do
  if member name ctx then error ("Variable '"++name++"' already exists.") else do
    vr <- newMetaVar
    let (TVar id) = vr
-   modify (\s -> s { context = insert name (if isArg then TArg id else vr) ctx })
+   if name == "_" then pure () else modify (\s -> s { context = insert name (if isArg then TArg id else vr) ctx })
    return $ TPatRef name vr
 typePattern _ (PatLit prm) = pure $ TPatLit prm $ typePrim prm
+typePattern isArg (PatConstr name args) = do
+ tArgs <- mapM (typePattern isArg) args
+ onlyTypes <- mapM getType tArgs
+ ret <- if name == "Cons" then tpCons onlyTypes else error "Constructors other than Cons not implemented yet"
+ return $ TPatConstr name tArgs ret
+ where
+  tpCons :: [Type]->State InferState Type
+  tpCons [headType, restType] = do
+   let lstTp = TConstr "List" [headType]
+   ret <- unify restType lstTp
+   return ret
+  tpCons (a: b: c) = do
+   ntp <- unify a b
+   ret <- tpCons (ntp: c)
+   return ret
+  tpCons _ = error "Wrong use of Cons"
+typePattern isArg (PatList lst) = do
+ tArgs <- mapM (typePattern isArg) lst
+ onlyTypes <- mapM getType tArgs
+ vr <- newMetaVar
+ ntp <- foldM unify vr onlyTypes
+ return $ TPatList tArgs (TConstr "List" [ntp])
 
 typeBindList :: [Bind]->State InferState [TBind]
 typeBindList lst = do
@@ -227,6 +249,14 @@ unifyPattern (TPatRef name typ) = do
  newTyp <- find typ
  return $ TPatRef name newTyp
 unifyPattern x@(TPatLit _ _) = pure x
+unifyPattern (TPatConstr name args tp) = do
+ uArgs <- mapM unifyPattern args
+ uTp <- find tp
+ return $ TPatConstr name uArgs uTp
+unifyPattern (TPatList lst tp) = do
+ uArgs <- mapM unifyPattern lst
+ uTp <- find tp
+ return $ TPatList uArgs uTp
 
 unifyVal :: TValue->State InferState TValue
 unifyVal x@(TValLit _ _) = pure x
@@ -313,7 +343,8 @@ arithmetic = [
  ("+", tBinArith tInt),
  ("-", tBinArith tInt),
  ("*", tBinArith tInt),
- ("/", tBinArith tInt)]
+ ("/", tBinArith tInt),
+ ("==", tFun tInt $ tFun tInt tBool)]
 
 basicLib = [
  ("if", tFun tBool $ tFun (TVar 0) $ tFun (TVar 0) (TVar 0)),

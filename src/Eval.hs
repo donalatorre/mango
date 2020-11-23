@@ -33,22 +33,26 @@ instance Eq MatchResult where
   (==) (Match e1) (Match e2) = True
   (==) _ _ = False
 
-matchUnion :: [MatchResult] -> Map String Data
-matchUnion [] = Data.Map.fromList $ []
-matchUnion ((Match x): xl) = Data.Map.union x (matchUnion xl)
+matchUnion :: [MatchResult] -> MatchResult
+matchUnion [] = Match $ mempty
+matchUnion (NoMatch: _) = NoMatch
+matchUnion ((Match x): xl) = case matchUnion xl of 
+ Match mp-> Match $ Data.Map.union x mp
+ _->NoMatch
 
 patternMatch :: Data->TPattern->MatchResult
+patternMatch _ (TPatRef "_" _) = Match mempty
 patternMatch info (TPatRef name _) = Match $ Data.Map.fromList [(name, info)]
 patternMatch (DataInt x) (TPatLit (PInt y) _) = if x == y then Match $ Data.Map.fromList [] else NoMatch
 patternMatch (DataDouble x) (TPatLit (PDouble y) _) = if x == y then Match $ Data.Map.fromList [] else NoMatch
 patternMatch (DataChar x) (TPatLit (PChar y) _) = if x == y then Match $ Data.Map.fromList [] else NoMatch
 patternMatch (DataBool x) (TPatLit (PBool y) _) = if x == y then Match $ Data.Map.fromList [] else NoMatch
-patternMatch (DataConstr "List" (x:xl)) (TPatConstr "Cons" [y, z] _) = 
-  if ((patternMatch x y) == NoMatch || (patternMatch (DataConstr "List" xl) z) == NoMatch) then NoMatch
-    else (Match (matchUnion [(patternMatch x y), (patternMatch (DataConstr "List" xl) z)]))
+patternMatch lst@(DataConstr "List" _) (TPatConstr "Cons" [pList] _) = patternMatch lst pList
+patternMatch (DataConstr "List" (x:xl)) (TPatConstr "Cons" (y:yl) tp) = matchUnion [patternMatch x y, patternMatch (DataConstr "List" xl) (TPatConstr "Cons" yl tp)]
 patternMatch (DataConstr x xl) (TPatConstr y yl _) = 
   if (x == y && (length xl) == (length yl) && (notElem NoMatch (zipWith patternMatch xl yl)))
-    then Match (matchUnion (zipWith patternMatch xl yl)) else NoMatch
+    then matchUnion (zipWith patternMatch xl yl) else NoMatch
+patternMatch (DataConstr "List" dlst) (TPatList plst _) = if length dlst /= length plst then NoMatch else matchUnion $ zipWith patternMatch dlst plst
 patternMatch _ _ = NoMatch
 
 patternListMatch :: [Data]->[TPattern]->MatchResult
@@ -140,8 +144,16 @@ resolve (TValLit (PInt x) _) = pure $ DataInt x
 resolve (TValLit (PBool x) _) = pure $ DataBool x
 resolve (TValLit (PDouble x) _) = pure $ DataDouble x
 resolve (TValLit (PChar x) _) = pure $ DataChar x
+resolve (TValLit (PString lst) _) = pure $ DataConstr "List" $ Prelude.map DataChar lst
 
 argNums = [
+ ("&&", 2),
+ ("||", 2),
+ ("==", 2),
+ ("<", 2),
+ (">", 2),
+ ("<=", 2),
+ (">=", 2),
  ("+", 2),
  ("-", 2),
  ("*", 2),
@@ -155,22 +167,41 @@ evaluate :: Func->[Data]->State ExecState Data
 evaluate a lst = evaluate' a (reverse lst)
  where
   evaluate' :: Func->[Data]->State ExecState Data
+  -- Basic boolean operators
+  evaluate' (PrimFunc "&&") [DataBool a, DataBool b] = pure $ DataBool $ a && b
+  evaluate' (PrimFunc "||") [DataBool a, DataBool b] = pure $ DataBool $ a || b
+  -- Primitive operators on int
+  evaluate' (PrimFunc "==") [DataInt a, DataInt b] = pure $ DataBool $ a == b
+  evaluate' (PrimFunc "<") [DataInt a, DataInt b] = pure $ DataBool $ a < b
+  evaluate' (PrimFunc ">") [DataInt a, DataInt b] = pure $ DataBool $ a > b
+  evaluate' (PrimFunc "<=") [DataInt a, DataInt b] = pure $ DataBool $ a <= b
+  evaluate' (PrimFunc ">=") [DataInt a, DataInt b] = pure $ DataBool $ a >= b
   evaluate' (PrimFunc "+") [DataInt a, DataInt b] = pure $ DataInt $ a + b
   evaluate' (PrimFunc "-") [DataInt a, DataInt b] = pure $ DataInt $ a - b
   evaluate' (PrimFunc "*") [DataInt a, DataInt b] = pure $ DataInt $ a * b
   evaluate' (PrimFunc "/") [DataInt a, DataInt b] = pure $ DataInt $ a `div` b
+  -- Primitive operators on doubles
+  evaluate' (PrimFunc "==") [DataDouble a, DataDouble b] = pure $ DataBool $ a == b
+  evaluate' (PrimFunc "<") [DataDouble a, DataDouble b] = pure $ DataBool $ a < b
+  evaluate' (PrimFunc ">") [DataDouble a, DataDouble b] = pure $ DataBool $ a > b
+  evaluate' (PrimFunc "<=") [DataDouble a, DataDouble b] = pure $ DataBool $ a <= b
+  evaluate' (PrimFunc ">=") [DataDouble a, DataDouble b] = pure $ DataBool $ a >= b
+  evaluate' (PrimFunc "+") [DataDouble a, DataDouble b] = pure $ DataDouble $ a + b
+  evaluate' (PrimFunc "-") [DataDouble a, DataDouble b] = pure $ DataDouble $ a - b
+  evaluate' (PrimFunc "*") [DataDouble a, DataDouble b] = pure $ DataDouble $ a * b
+  evaluate' (PrimFunc "/") [DataDouble a, DataDouble b] = pure $ DataDouble $ a / b
+
   evaluate' (PrimFunc "if") [DataBool cond, onTrue, onFalse] = pure $ if cond then onTrue else onFalse
   evaluate' (PrimFunc "++") [DataConstr "List" lsta, DataConstr "List" lstb] = pure $ DataConstr "List" $ lsta ++ lstb
   evaluate' (PrimFunc _) _ = error "Fatal error: wrong call to primitive function"
   
   evaluate' (Func opts) args = do
-   let revArgs = reverse args
-   toRet <- tryEval revArgs opts
+   toRet <- tryEval opts
    return toRet
    where
-    tryEval revArgs [] = error "Non-exhaustive function"
-    tryEval revArgs ((ptrns, ret):xs) = case patternListMatch revArgs ptrns of
-     NoMatch-> tryEval revArgs xs
+    tryEval [] = error "Non-exhaustive function"
+    tryEval ((ptrns, ret):xs) = case patternListMatch args ptrns of
+     NoMatch-> tryEval xs
      Match lcl -> do
       old <- local <$> get
       modify (\s->s { local = lcl })

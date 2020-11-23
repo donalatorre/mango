@@ -22,11 +22,12 @@ main = do
  let compiled = compile s
  let x = 1
  putStrLn ("=============================================================================================")
- putStrLn ("\nParsing successful!\nResult:\n\n"++ (ppShow compiled))
+ putStrLn ("\nParsing Result:\n\n"++ (ppShow compiled))
+ putStrLn ("=============================================================================================")
+ putStrLn ("Parsing succeeded!\n")
  let typed = typeProgram compiled
+ putStrLn ("\nTyping Result:\n\n"++ (ppShow typed))
  putStrLn ("=============================================================================================")
- putStrLn ("\nTyping successful!\nResult:\n\n"++ (ppShow typed))
- putStrLn ("=============================================================================================")
- putStrLn ("=============================================================================================")
+ putStrLn ("Typing succeded!\n")
  putStrLn ("\nRUNNING PROGRAM:")
  resolveProgram typed

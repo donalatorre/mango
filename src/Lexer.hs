@@ -134,13 +134,17 @@ parsePrim = parseString <|> parseBool <|> parseChar <|> (try parseDouble) <|> pa
    x <- many (noneOf "\"")
    char '"'
    return $ PString x
-  parseInteger = liftM (PInt . read) $ many1 digit
+  parseInteger = parsePosInt <|> parseNegInt
+   where
+    parseNegInt = char '-' >> (liftM (PInt . (0 -) . read) $ many1 digit)
+    parsePosInt = liftM (PInt . read) $ many1 digit
   parseChar = do {string "'"; ret <- letter; string "'"; return $ PChar ret}
   parseDouble = do
+   sign <- try (char '-' >> (pure (-1.0))) <|> (pure 1.0)
    intg <- many1 digit
    char '.'
    decm <- many1 digit
-   return $ (PDouble . read) $ intg ++ "." ++ decm
+   return $ (PDouble . (sign *) . (read)) $ intg ++ "." ++ decm
   parseBool = parseTrue <|> parseFalse
   parseTrue = do {string "True"; return $ PBool True}
   parseFalse = do {string "False"; return $ PBool False}
