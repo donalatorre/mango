@@ -1,8 +1,9 @@
 (let factorial
 	(\ [0] 1)
-	(\ [n] (* (factorial (- n 1)) n))
+	(\ [n] (* n (factorial (- n 1))))
 )
 
 (main
-	(print (factorial 4))
+	(print (factorial 10))
 )
+

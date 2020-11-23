@@ -7,7 +7,7 @@ import Data.Map
 import Control.Monad
 
 data TBind = TBindVal TPattern [TValue] deriving (Show) -- TODO: enable type constraints
-data TPattern = TPatLit Prim Type | TPatConstr String [TPattern] Type | TPatList [Pattern] Type | TPatRef String Type deriving (Show)
+data TPattern = TPatLit Prim Type | TPatConstr String [TPattern] Type | TPatList [TPattern] Type | TPatRef String Type deriving (Show)
 data TValue = TValLit Prim Type
  | TValConstr String [TValue] Type
  | TValCall String [TValue] Type
