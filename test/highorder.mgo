@@ -1,0 +1,24 @@
+(let map
+  (\ [ _, [] ] [])
+	(\ [ fun, (Cons x xs) ] (Cons (fun x) (map fun xs)))
+)
+
+(let foldl
+  (\ [ _, val, [] ] val)
+	(\ [ fun, val, (Cons x xs) ] (foldl fun (fun val x) xs))
+)
+
+(let zipWith
+  (\ [_, [], _] [])
+	(\ [_, _, []] [])
+	(\ [fun, (Cons a as), (Cons b bs)] (Cons (fun a b) (zipWith fun as bs)))
+)
+
+(main
+  (var lst [1, 2, 3, 4, 5])
+  (print (map (+ 1) lst))
+	(print (foldl + 0 lst))
+  (var blst [10, 20, 30, 40, 50])
+	(print (zipWith * lst blst))
+)
+

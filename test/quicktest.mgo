@@ -1,8 +1,11 @@
-(let ff 
-  (\ [ []] 1)
-  (\ [ [3]] 3)
+
+(let zipWith
+	(\ [_, [], _] [])
+	(\ [_, _, []] [])
+	(\ [fun, a, b] (Cons (fun a b) (zipWith fun a b)))
 )
+
 (main
-  (print (ff [0]))
+	(print 2)
 )
 

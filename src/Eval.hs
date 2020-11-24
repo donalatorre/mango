@@ -139,6 +139,12 @@ resolve (TValCall name args _) = do
 
 resolve (TValList lst _) = liftM (DataConstr "List") (mapM resolve lst)
 resolve (TValLambda ptrns ret _ _) = pure $ DataCall (Func [(ptrns, ret)]) [] (length ptrns)
+resolve (TValConstr "Cons" [xs] _) = resolve xs
+resolve (TValConstr "Cons" (x: xs) tp) = do
+ rX <- resolve x
+ rXs <- resolve $ TValConstr "Cons" xs tp
+ let (DataConstr "List" tail) = rXs
+ return $ DataConstr "List" (rX: tail)
 
 resolve (TValLit (PInt x) _) = pure $ DataInt x
 resolve (TValLit (PBool x) _) = pure $ DataBool x

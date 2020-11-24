@@ -40,7 +40,7 @@ abstractList :: Parser a->Parser[a]
 abstractList parseItem = do
  char '[' >> many blank
  list <- (sepEndBy parseItem $ (char ',' >> skipMany blank))
- char ']'
+ many blank >> char ']'
  return list
 
 parseProgram :: Program->Parser Program

@@ -5,6 +5,7 @@ import Data.Maybe
 import Control.Monad.State.Lazy
 import Data.Map
 import Control.Monad
+import Text.Show.Pretty (ppShow)
 
 data TBind = TBindVal TPattern [TValue] deriving (Show) -- TODO: enable type constraints
 data TPattern = TPatLit Prim Type | TPatConstr String [TPattern] Type | TPatList [TPattern] Type | TPatRef String Type deriving (Show)
@@ -37,7 +38,8 @@ instance Typed TValue where
 
 data InferState = InferState {
   store :: Map Int Type,
-  context :: Map String Type,
+  gContext :: Map String Type,
+  lContext :: Map String Type,
   var_count :: Int,
   --TODO: change into multiple state
   specMap :: Map Int Type
@@ -54,7 +56,7 @@ unify :: Type->Type->State InferState Type
 unify a b = do
  prntA <- find a
  prntB <- find b
- unified <- unify' a b
+ unified <- unify' prntA prntB
  return unified
  where
   unify' :: Type->Type->State InferState Type
@@ -66,11 +68,6 @@ unify a b = do
 
 find :: Type->State InferState Type
 
-find (TArg id) = do
- found <- find $ TVar id
- let (TVar foundId) = found
- return $ TArg foundId
-
 find (TConstr nm args) = do
  evld <- mapM find args
  return $ TConstr nm evld
@@ -81,7 +78,7 @@ find (TVar x) = do
  newY <- case y of 
   TVar x -> pure y
   _ -> find y
- modify (\s -> s { store = insert x newY str })
+ modify (\s -> s { store = insert x newY (store s) })
  return newY
 
 specify :: Type->Type->State InferState Type
@@ -102,7 +99,7 @@ specify a b = do
   specify' (TVar x) b = do
    spec <- specMap <$> get
    let matched = Data.Map.lookup x spec
-   ret <- if isJust matched then unify b (fromJust matched) else (modify (\s -> s {specMap = insert x b spec})) >> pure b
+   ret <- if isJust matched then unify b (fromJust matched) else (modify (\s -> s {specMap = insert x b (specMap s)})) >> pure b
    return ret
 
 newMetaVar :: State InferState Type
@@ -130,16 +127,17 @@ typePrim prm = TConstr (case prm of
 typeVal :: Value->State InferState TValue
 typeVal (ValLit prm) = pure $ TValLit prm $ typePrim prm
 typeVal (ValCall name args) = do
- ctx <- context <$> get
- let rawPrnt = Data.Map.lookup name ctx
- let prnt = if isNothing rawPrnt then error ("Variable '"++name++"' not in scope.") else rawPrnt
- let (Just prntTyp) = prnt
  ret <- newMetaVar
  typedArgs <- mapM typeVal args
- finalPrntTyp <- case prntTyp of
-  TArg id-> getFuncType typedArgs ret (TVar id)
-  _->pure $ TInst prntTyp ret
- return $ TValCall name typedArgs finalPrntTyp
+ lCtx <- lContext <$> get
+ gCtx <- gContext <$> get
+ finalTyp <- case (Data.Map.lookup name lCtx, Data.Map.lookup name gCtx) of
+  (Nothing, Nothing) -> error ("Variable '"++name++"' not in scope.")
+  (Just lclVr, Nothing) -> getFuncType typedArgs ret lclVr
+  (Nothing, Just gblVr) -> pure $ TInst gblVr ret
+ topr <- store <$> get
+ otrpr <- lContext <$> get
+ return $ TValCall name typedArgs finalTyp
  where
   getFuncType typedArgs ret vr = do
    onlyTypes <- mapM getType typedArgs
@@ -148,14 +146,14 @@ typeVal (ValCall name args) = do
    return $ destructFun unified onlyTypes
 
 typeVal (ValLambda (args, ret) _) = do
- oldCtx <- context <$> get
+ oldCtx <- lContext <$> get
  typedArgs <- mapM (typePattern True) args
  onlyTypes <- mapM getType typedArgs
  typedRet <- typeVal ret
  onlyRetType <- getType typedRet
  let funcTyp = arrow onlyTypes onlyRetType
- -- Go back to original context
- modify (\s -> s {context = oldCtx})
+ -- Go back to original local lContext
+ modify (\s -> s {lContext = oldCtx})
  return $ TValLambda typedArgs typedRet [] funcTyp
  where
   arrow :: [Type]->Type->Type
@@ -169,13 +167,31 @@ typeVal (ValList args) = do
  finalVr <- foldM unify vr onlyTypes
  return $ TValList typedArgs $ TConstr "List" [finalVr]
 
+typeVal (ValConstr name args) = do
+ tArgs <- mapM typeVal args
+ onlyTypes <- mapM getType tArgs
+ ret <- if name == "Cons" then tpCons onlyTypes else error "Constructors other than Cons not implemented yet"
+ return $ TValConstr name tArgs ret
+
+tpCons :: [Type]->State InferState Type
+tpCons [headType, restType] = do
+ let lstTp = TConstr "List" [headType]
+ ret <- unify restType lstTp
+ return ret
+tpCons (a: b: c) = do
+ ntp <- unify a b
+ ret <- tpCons (ntp: c)
+ return ret
+tpCons _ = error "Wrong use of Cons"
+
 typePattern :: Bool->Pattern->State InferState TPattern
 typePattern isArg (PatRef name) = do
- ctx <- context <$> get
- if member name ctx then error ("Variable '"++name++"' already exists.") else do
+ lCtx <- lContext <$> get
+ gCtx <- gContext <$> get
+ let ctx = if isArg then lCtx else gCtx
+ if member name lCtx || member name gCtx then error ("Variable '"++name++"' already exists.") else do
    vr <- newMetaVar
-   let (TVar id) = vr
-   if name == "_" then pure () else modify (\s -> s { context = insert name (if isArg then TArg id else vr) ctx })
+   if name == "_" then pure () else modify (\s -> if isArg then (s { lContext = insert name vr ctx}) else (s {gContext = insert name vr ctx}))
    return $ TPatRef name vr
 typePattern _ (PatLit prm) = pure $ TPatLit prm $ typePrim prm
 typePattern isArg (PatConstr name args) = do
@@ -183,17 +199,7 @@ typePattern isArg (PatConstr name args) = do
  onlyTypes <- mapM getType tArgs
  ret <- if name == "Cons" then tpCons onlyTypes else error "Constructors other than Cons not implemented yet"
  return $ TPatConstr name tArgs ret
- where
-  tpCons :: [Type]->State InferState Type
-  tpCons [headType, restType] = do
-   let lstTp = TConstr "List" [headType]
-   ret <- unify restType lstTp
-   return ret
-  tpCons (a: b: c) = do
-   ntp <- unify a b
-   ret <- tpCons (ntp: c)
-   return ret
-  tpCons _ = error "Wrong use of Cons"
+
 typePattern isArg (PatList lst) = do
  tArgs <- mapM (typePattern isArg) lst
  onlyTypes <- mapM getType tArgs
@@ -203,7 +209,7 @@ typePattern isArg (PatList lst) = do
 
 typeBindList :: [Bind]->State InferState [TBind]
 typeBindList lst = do
- oldCtx <- context <$> get
+ --oldCtx <- context <$> get
  storedBinds <- mapM storeBind lst
  -- Store binds in context before actually resolving, so values can have calls to one another, regardless of the order they were written in.
  typedBodies <- mapM typeBody lst
@@ -232,16 +238,21 @@ typeBindList lst = do
 
 typeAction :: Action->State InferState TAction
 typeAction (Assign ptrn vlus) = do
- tPtrn <- ((typePattern True) >=> unifyPattern) ptrn
- tVlus <- mapM (typeVal >=> unifyVal) vlus
- return $ TAssign tPtrn tVlus
+ tPtrn <- typePattern False ptrn
+ tVlus <- mapM typeVal vlus
+ onlyTPtrn <- getType tPtrn
+ onlyTVlus <- mapM getType tVlus
+ foldM_ unify onlyTPtrn onlyTVlus
+ uPtrn <- unifyPattern tPtrn
+ uVlus <- mapM unifyVal tVlus
+ return $ TAssign uPtrn uVlus
 typeAction (Print vlus) = do
  tVlus <- mapM (typeVal >=> unifyVal) vlus
  return $ TPrint tVlus
 typeAction (Read rd) = do
- ctx <- context <$> get
+ ctx <- gContext <$> get
  if Data.Map.member rd ctx then error ("Variable '"++rd++"' already exists") else do
-  modify (\s->s{ context = insert rd (TConstr "String" []) (context s) })
+  modify (\s->s{ gContext = insert rd (TConstr "String" []) ctx })
   return $ TRead rd
 
 unifyPattern :: TPattern->State InferState TPattern
@@ -285,6 +296,10 @@ unifyVal (TValCall name args typ) = do
    let specifiedSon = destructFun specifiedFun argTypes
    modify (\s -> s {specMap = empty})
    return $ TInst newPar specifiedSon
+unifyVal (TValConstr name args typ) = do
+ uArgs <- mapM unifyVal args
+ uTp <- find typ
+ return $ TValConstr name uArgs uTp
 
 unifyBindList :: [TBind]->State InferState [TBind]
 unifyBindList lst = mapM unifyBind lst
@@ -315,8 +330,9 @@ typeProgram (Program _ _ _ binds (Just actions)) = typed
    return $ TProgram tBinds tActions
 
 initialState :: InferState
-initialState = InferState (fromList [(0, TVar 0)]) (fromList globalCtx) 1 empty
+initialState = InferState (fromList [(0, TVar 0)]) (fromList globalCtx) empty 1 empty
 
+{--
 headTyp = TConstr "TFun" [TConstr "List" [TVar 0], TVar 0]
 headCall = TConstr "TFun" [TConstr "List" [TVar 1], TVar 2]
 headStore = InferState (fromList [(0, TVar 0), (1, TVar 1), (2, TVar 2)]) empty 0 empty
@@ -328,6 +344,7 @@ bv = BindVal (PatRef "x") [ ValLit (PInt 3) ]
 
 myCall = (ValCall "+" [ValLit $ PInt 2, ValLit $ PInt 3])
 myLamb = ValLambda ([PatRef "a", PatRef "b"], ValCall "c" []) []
+--}
 --vlu wh init = runState (typeVal wh) init
 
 tFun a b = TConstr "TFun" [a, b]
