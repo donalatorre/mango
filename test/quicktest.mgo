@@ -1,10 +1,6 @@
 
 (main
-	(read rd)
-  (var fac
-    (\ [ 0 ] "uno")
-		(\ [ n ] rd)
-	)
-	(print (fac 9))
+	(read name)
+	(print (++ "Hello, " name))
 )
 

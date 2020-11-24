@@ -16,9 +16,12 @@
 (let qsort
   (\ [ [] ] [])
 	(\ [ (Cons x xs) ] 
+	  (++
+		  (qsort (filter (> x) xs))
 			(++ 
 			  (Cons x (filter (== x) xs))
 				(qsort (filter (< x) xs))
+			)
 		)
 	)
 )

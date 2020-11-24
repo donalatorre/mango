@@ -17,7 +17,7 @@ data TValue = TValLit Prim Type
 data TAction = TAssign TPattern [TValue] | TPrint [TValue] | TRead String deriving (Show)
 data TProgram = TProgram [TBind] [TAction] deriving (Show)
 
-data Type = TConstr String [Type] | TVar Int | TArg Int | TInst Type Type deriving (Show)
+data Type = TConstr String [Type] | TVar Int | TInst Type Type deriving (Show)
 
 
 class Typed a where
@@ -117,12 +117,13 @@ typeCall [] = error "Empty list"
 typeCall [x] = x
 typeCall (x: xs) = TConstr "TFun" [x, typeCall xs]
 
-typePrim prm = TConstr (case prm of
- PBool _ -> "Bool"
- PInt _ -> "Int"
- PDouble _ -> "Double"
- PString _ -> "String"
- PChar _ -> "Char") []
+typePrim prm = case prm of
+ PString _ -> TConstr "List" [TConstr "Char" []]
+ _ -> TConstr (case prm of
+  PBool _ -> "Bool"
+  PInt _ -> "Int"
+  PDouble _ -> "Double"
+  PChar _ -> "Char") []
 
 typeVal :: Value->State InferState TValue
 typeVal (ValLit prm) = pure $ TValLit prm $ typePrim prm
@@ -259,7 +260,7 @@ typeAction (Print vlus) = do
 typeAction (Read rd) = do
  ctx <- gContext <$> get
  if Data.Map.member rd ctx then error ("Variable '"++rd++"' already exists") else do
-  modify (\s->s{ gContext = insert rd (TConstr "String" []) ctx })
+  modify (\s->s{ gContext = insert rd (TConstr "List" [TConstr "Char" []]) ctx })
   return $ TRead rd
 
 unifyPattern :: TPattern->State InferState TPattern
@@ -337,7 +338,15 @@ typeProgram (Program _ _ _ binds (Just actions)) = typed
    return $ TProgram tBinds tActions
 
 initialState :: InferState
-initialState = InferState (fromList [(0, TVar 0)]) (fromList globalCtx) empty 1 empty
+initialState = execState (mapM checkBasicPolys (Prelude.map snd globalCtx)) $ InferState empty (fromList globalCtx) empty 0 empty
+ where
+  checkBasicPolys :: Type->State InferState Type
+  checkBasicPolys (TVar x) = do
+   modify (\s->s{store = insert x (TVar x) (store s)})
+   vrc <- var_count <$> get
+   if vrc <= x then modify (\s->s{var_count = x + 1}) else pure ()
+   return $ TVar x
+  checkBasicPolys (TConstr name lst) = liftM (TConstr name) (mapM checkBasicPolys lst)
 
 {--
 headTyp = TConstr "TFun" [TConstr "List" [TVar 0], TVar 0]
@@ -358,8 +367,6 @@ tFun a b = TConstr "TFun" [a, b]
 tBool = TConstr "Bool" []
 tInt = TConstr "Int" []
 tDouble = TConstr "Double" []
-tString = TConstr "String" []
-
 
 tBinArith tp = tFun tp (tFun tp tp)
 
@@ -377,6 +384,6 @@ arithmetic = [
 
 basicLib = [
  ("if", tFun tBool $ tFun (TVar 0) $ tFun (TVar 0) (TVar 0)),
- ("++", tFun tString $ tFun tString tString)]
+ ("++", tFun (TConstr "List" [TVar 1]) $ tFun (TConstr "List" [TVar 1]) (TConstr "List" [TVar 1]))]
 
 globalCtx = arithmetic ++ basicLib
