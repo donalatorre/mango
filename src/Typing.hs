@@ -245,10 +245,17 @@ typeAction (Assign ptrn vlus) = do
  foldM_ unify onlyTPtrn onlyTVlus
  uPtrn <- unifyPattern tPtrn
  uVlus <- mapM unifyVal tVlus
- return $ TAssign uPtrn uVlus
+ uPtrn' <- unifyPattern uPtrn
+ uVlus' <- mapM unifyVal uVlus
+ uPtrn'' <- unifyPattern uPtrn'
+ uVlus'' <- mapM unifyVal uVlus'
+ return $ TAssign uPtrn'' uVlus''
 typeAction (Print vlus) = do
- tVlus <- mapM (typeVal >=> unifyVal) vlus
- return $ TPrint tVlus
+ tVlus <- mapM typeVal vlus
+ uVlus <- mapM unifyVal tVlus
+ uVlus' <- mapM unifyVal uVlus
+ uVlus'' <- mapM unifyVal uVlus'
+ return $ TPrint uVlus''
 typeAction (Read rd) = do
  ctx <- gContext <$> get
  if Data.Map.member rd ctx then error ("Variable '"++rd++"' already exists") else do
@@ -361,7 +368,12 @@ arithmetic = [
  ("-", tBinArith tInt),
  ("*", tBinArith tInt),
  ("/", tBinArith tInt),
- ("==", tFun tInt $ tFun tInt tBool)]
+ ("%", tBinArith tInt),
+ ("==", tFun tInt $ tFun tInt tBool),
+ ("<", tFun tInt $ tFun tInt tBool),
+ (">", tFun tInt $ tFun tInt tBool),
+ ("<=", tFun tInt $ tFun tInt tBool),
+ (">=", tFun tInt $ tFun tInt tBool)]
 
 basicLib = [
  ("if", tFun tBool $ tFun (TVar 0) $ tFun (TVar 0) (TVar 0)),

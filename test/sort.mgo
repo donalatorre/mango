@@ -1,17 +1,31 @@
-(:: insert [a, [a], [a]])
 (let insert
 	(\ [value, []] [value])
-	(\ [value, (Cons x xs)] if (value <= x)  (Cons value (Cons x xs)) (Cons x (insert value xs)))
+	(\ [value, (Cons x xs)] (if (<= value x) (Cons value (Cons x xs)) (Cons x (insert value xs))))
 )
 
-(:: sort [[a], [a]])
+(let filter
+  (\ [_, []] [])
+	(\ [fun, (Cons x xs)] (if (fun x) (Cons x (filter fun xs)) (filter fun xs)))
+)
+
 (let sort
 	(\ [[]] [])
 	(\ [(Cons x xs)] (insert x (sort xs)))
 )
 
+(let qsort
+  (\ [ [] ] [])
+	(\ [ (Cons x xs) ] 
+			(++ 
+			  (Cons x (filter (== x) xs))
+				(qsort (filter (< x) xs))
+		)
+	)
+)
+
 (main
-	(read x)
-	(var res (sort x))
+	(var x [1, 9, 5, 3, 20, 2])
+	(var res (qsort x))
 	(print res)
 )
+

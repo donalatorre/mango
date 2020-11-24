@@ -1,11 +1,10 @@
 
-(let zipWith
-	(\ [_, [], _] [])
-	(\ [_, _, []] [])
-	(\ [fun, a, b] (Cons (fun a b) (zipWith fun a b)))
-)
-
 (main
-	(print 2)
+	(read rd)
+  (var fac
+    (\ [ 0 ] "uno")
+		(\ [ n ] rd)
+	)
+	(print (fac 9))
 )
 

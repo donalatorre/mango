@@ -67,7 +67,7 @@ handleMultiDef :: [Data]->Data
 handleMultiDef [x] = x
 handleMultiDef (DataCall (Func lsta) [] argcA: DataCall (Func lstb) [] argcB: rest) = if argcA == argcB then
  handleMultiDef (DataCall (Func $ lsta++lstb) [] argcA: rest) else error $ "Fatal error: Different number of args"
-handleMultiDef x = error $ "x is " ++ (ppShow x)
+--handleMultiDef x = error $ "x is " ++ (ppShow x)
 
 resolveBind :: TBind->State ExecState ()
 resolveBind (TBindVal pat vls) = do
@@ -164,6 +164,7 @@ argNums = [
  ("-", 2),
  ("*", 2),
  ("/", 2),
+ ("%", 2),
  ("if", 3),
  ("++", 2)]
 
@@ -186,6 +187,7 @@ evaluate a lst = evaluate' a (reverse lst)
   evaluate' (PrimFunc "-") [DataInt a, DataInt b] = pure $ DataInt $ a - b
   evaluate' (PrimFunc "*") [DataInt a, DataInt b] = pure $ DataInt $ a * b
   evaluate' (PrimFunc "/") [DataInt a, DataInt b] = pure $ DataInt $ a `div` b
+  evaluate' (PrimFunc "%") [DataInt a, DataInt b] = pure $ DataInt $ a `mod` b
   -- Primitive operators on doubles
   evaluate' (PrimFunc "==") [DataDouble a, DataDouble b] = pure $ DataBool $ a == b
   evaluate' (PrimFunc "<") [DataDouble a, DataDouble b] = pure $ DataBool $ a < b
