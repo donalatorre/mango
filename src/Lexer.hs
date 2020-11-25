@@ -73,10 +73,20 @@ parseProgram prog@(Program tdl cdl cil bl vll) = (try parseProgItem) <|> ((many 
    _ -> error "Multiple main declarations")) $ strictApply (string "main") parseAction
 
 parseAction :: Parser Action
-parseAction = (try parseRead) <|> (try parsePrint) <|> parseAssign
+parseAction = (try parseRead) <|> (try parseReadM) <|> (try parsePrint) <|> parseAssign
 
 parsePrint :: Parser Action
 parsePrint = try $ liftM ($(\_ pv -> Print pv)) $strictApply (string "print") parseValue
+
+parseReadM :: Parser Action
+parseReadM = try $ liftM ($(\t name -> ReadM t name)) $singleApply parseHead parseNonUpper
+ where
+  parseHead :: Parser Int
+  parseHead = do
+   string "readMany"
+   many1 blank
+   dgs <- many1 digit
+   return $ read dgs
 
 parseRead :: Parser Action
 parseRead = try $ liftM ($(\_ name -> Read name)) $singleApply (string "read") parseNonUpper

@@ -1,29 +1,14 @@
-(let map
-  (\ [ _, [] ] [])
-	(\ [ fun, (Cons x xs) ] (Cons (fun x) (map fun xs)))
-)
-
-(let foldl
-  (\ [ _, val, [] ] val)
-	(\ [ fun, val, (Cons x xs) ] (foldl fun (fun val x) xs))
-)
-
-(let showList
-  (\ [ _, [] ] "")
-	(\ [ _, [x] ] (show x))
-  (\ [sep, (Cons x xs) ]
-	  (++ (show x) (++ sep (showList sep xs)))
+(let sepLns
+  (\ [ [] ] ['\n'])
+  (\ [ (Cons x xs) ]
+    (++
+      x (++ ['\n'] (sepLns xs))
+		)
 	)
 )
 
 (main
-	(var m2 [
-		  [7, 8],
-			[9, 10],
-			[11, 12]
-    ]
-	)
-	(var smth (foldl (\ [a, b] (++ a (++ ['\n'] b))) "" (map (showList ", ") m2)))
-	(print smth)
+	(readMany 5 lines)
+  (print (sepLns lines))
 )
 

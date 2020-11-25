@@ -95,6 +95,10 @@ resolveAction stt (TRead name) = do
  ln <- getLine
  return $ stt { global = Data.Map.insert name (Right $ DataConstr "List" $ Prelude.map DataChar ln) (global stt) }
 
+resolveAction stt (TReadM t name) = do
+ lns <- replicateM t getLine
+ return $ stt { global = Data.Map.insert name (Right $ DataConstr "List" $ Prelude.map (\ln->DataConstr "List" $ Prelude.map DataChar ln) lns) (global stt) }
+
 resolveAction stt (TPrint vls) = do
  let (rVls, newStt) = runState (mapM ((resolve >=> (\x->evaluate (PrimFunc "show") [x]))) vls) stt
  let flatStrings = Prelude.map (\(DataConstr "List" chrs)-> Prelude.map (\(DataChar c)->c) chrs) rVls

@@ -21,7 +21,7 @@ data TValue = TValLit Prim Type
  | TValCall String [TValue] Type
  | TValList [TValue] Type
  | TValLambda [TPattern] TValue [TBind] Type deriving (Show)
-data TAction = TAssign TPattern [TValue] | TPrint [TValue] | TRead String deriving (Show)
+data TAction = TAssign TPattern [TValue] | TPrint [TValue] | TRead String | TReadM Int String deriving (Show)
 data TProgram = TProgram [TBind] [TAction] deriving (Show)
 
 data Type = TConstr String [Type] | TVar Int (Set String) | TInst Type Type deriving (Show)
@@ -300,6 +300,11 @@ typeAction (Read rd) = do
  if Data.Map.member rd ctx then error ("Variable '"++rd++"' already exists") else do
   modify (\s->s{ gContext = Data.Map.insert rd (TConstr "List" [TConstr "Char" []]) ctx })
   return $ TRead rd
+typeAction (ReadM t rd) = do
+ ctx <- gContext <$> get
+ if Data.Map.member rd ctx then error ("Variable '"++rd++"' already exists") else do
+  modify (\s->s{ gContext = Data.Map.insert rd (TConstr "List" [TConstr "List" [TConstr "Char" []]]) ctx })
+  return $ TReadM t rd
 
 unifyPattern :: TPattern->State InferState TPattern
 unifyPattern (TPatRef name typ) = do
