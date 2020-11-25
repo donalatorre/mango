@@ -138,7 +138,7 @@ parsePrim = parseString <|> parseBool <|> parseChar <|> (try parseDouble) <|> pa
    where
     parseNegInt = char '-' >> (liftM (PInt . (0 -) . read) $ many1 digit)
     parsePosInt = liftM (PInt . read) $ many1 digit
-  parseChar = do {string "'"; ret <- letter; string "'"; return $ PChar ret}
+  parseChar = do {string "'"; ret <- try (char '\\' >> char 'n' >> pure '\n') <|> letter; string "'"; return $ PChar ret}
   parseDouble = do
    sign <- try (char '-' >> (pure (-1.0))) <|> (pure 1.0)
    intg <- many1 digit

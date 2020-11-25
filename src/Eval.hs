@@ -89,10 +89,11 @@ resolveAction stt (TRead name) = do
  return $ stt { global = Data.Map.insert name (Right $ DataConstr "List" $ Prelude.map DataChar ln) (global stt) }
 
 resolveAction stt (TPrint vls) = do
- let (rVls, newStt) = runState (mapM resolve vls) stt
- let toPrint = Prelude.foldl (++) "" (Prelude.map show rVls)
- putStrLn toPrint
- return stt
+ let (rVls, newStt) = runState (mapM ((resolve >=> (\x->evaluate (PrimFunc "show") [x]))) vls) stt
+ let flatStrings = Prelude.map (\(DataConstr "List" chrs)-> Prelude.map (\(DataChar c)->c) chrs) rVls
+ let toPrint = Prelude.foldl (++) "" flatStrings
+ putStrLn $ toPrint
+ return newStt
 
 resolveProgram (TProgram bds acts) = foldM_ resolveAction rBds acts
  where
@@ -166,13 +167,18 @@ argNums = [
  ("/", 2),
  ("%", 2),
  ("if", 3),
- ("++", 2)]
+ ("++", 2),
+ ("show", 1),
+ ("parseInt", 1),
+ ("parseDouble", 1)]
 
 primitiveCtx = Data.Map.fromList $ Prelude.map (\(name, num) -> (name, Right $ DataCall (PrimFunc name) [] num)) argNums
 
 evaluate :: Func->[Data]->State ExecState Data
 evaluate a lst = evaluate' a (reverse lst)
  where
+  toMangoStr str = DataConstr "List" $ Prelude.map DataChar str
+  fromMangoStr (DataConstr "List" lst) = Prelude.map (\(DataChar c)->c) lst
   evaluate' :: Func->[Data]->State ExecState Data
   -- Basic boolean operators
   evaluate' (PrimFunc "&&") [DataBool a, DataBool b] = pure $ DataBool $ a && b
@@ -198,10 +204,19 @@ evaluate a lst = evaluate' a (reverse lst)
   evaluate' (PrimFunc "-") [DataDouble a, DataDouble b] = pure $ DataDouble $ a - b
   evaluate' (PrimFunc "*") [DataDouble a, DataDouble b] = pure $ DataDouble $ a * b
   evaluate' (PrimFunc "/") [DataDouble a, DataDouble b] = pure $ DataDouble $ a / b
+  -- Instances of show
+  evaluate' (PrimFunc "show") [DataInt x] = pure $ toMangoStr $ show x
+  evaluate' (PrimFunc "show") [DataDouble x] = pure $ toMangoStr $ show x
+  evaluate' (PrimFunc "show") [DataBool x] = pure $ toMangoStr $ show x
+  evaluate' (PrimFunc "show") ch@[(DataChar x)] = pure $ DataConstr "List" ch
+  evaluate' (PrimFunc "show") [str@(DataConstr "List" _)] = pure str
+  -- Instances of parse
+  evaluate' (PrimFunc "parseInt") [x@(DataConstr "List" _)] = pure $ DataInt $ read $ fromMangoStr x
+  evaluate' (PrimFunc "parseDouble") [x@(DataConstr "List" _)] = pure $ DataDouble $ read $ fromMangoStr x
 
   evaluate' (PrimFunc "if") [DataBool cond, onTrue, onFalse] = pure $ if cond then onTrue else onFalse
   evaluate' (PrimFunc "++") [DataConstr "List" lsta, DataConstr "List" lstb] = pure $ DataConstr "List" $ lsta ++ lstb
-  evaluate' (PrimFunc _) _ = error "Fatal error: wrong call to primitive function"
+  evaluate' (PrimFunc _) xx = error $ "Fatal error: wrong call to primitive function"++(ppShow xx)
   
   evaluate' (Func opts) args = do
    toRet <- tryEval opts

@@ -1,9 +1,11 @@
+{-# OPTIONS_GHC -XBangPatterns #-}
 module Typing where
 
 import DataTypes
 import Data.Maybe
 import Control.Monad.State.Lazy
 import Data.Map
+import Data.Set
 import Control.Monad
 import Text.Show.Pretty (ppShow)
 
@@ -17,7 +19,7 @@ data TValue = TValLit Prim Type
 data TAction = TAssign TPattern [TValue] | TPrint [TValue] | TRead String deriving (Show)
 data TProgram = TProgram [TBind] [TAction] deriving (Show)
 
-data Type = TConstr String [Type] | TVar Int | TInst Type Type deriving (Show)
+data Type = TConstr String [Type] | TVar Int (Set String) | TInst Type Type deriving (Show)
 
 
 class Typed a where
@@ -37,6 +39,7 @@ instance Typed TValue where
  getType (TValLambda _ _ _ tp) = find tp
 
 data InferState = InferState {
+  insts :: Set (String, String),
   store :: Map Int Type,
   gContext :: Map String Type,
   lContext :: Map String Type,
@@ -45,7 +48,7 @@ data InferState = InferState {
   specMap :: Map Int Type
 } deriving (Show)
 
-runConstr (TConstr a args) (TConstr b brgs) fun = if a /= b then error ("Couldn't unify '"++a++"'"++" with '"++b++"'") else checkedResult
+runConstr (TConstr a args) (TConstr b brgs) fun = if a /= b then error ("Couldn't match '"++a++"'"++" with '"++b++"'") else checkedResult
  where
   checkedResult = if (length args) == (length brgs) then result else error "Constructors don't have the same number of arguments"
   result = do
@@ -61,10 +64,29 @@ unify a b = do
  where
   unify' :: Type->Type->State InferState Type
   unify' x@(TConstr _ _) y@(TConstr _ _) = runConstr x y (zipWithM unify')
-  unify' a@(TConstr _ _) b@(TVar _) = unify' b a
-  unify' (TVar x) b = do
-   modify (\s -> s { store = insert x b (store s) })
-   return b
+  unify' a@(TConstr _ _) b@(TVar _ _) = unify' b a
+  unify' (TVar x xc) b = do
+   newTp <- satisfy b (Data.Set.toList xc)
+   modify (\s->s { store = Data.Map.insert x newTp (store s) })
+   return newTp
+
+satisfy :: Type->[String]->State InferState Type
+satisfy tp cns = do
+ inst <- insts <$> get
+ ret <- satisfy' tp cns inst
+ return ret
+ where
+  satisfy' :: Type->[String]->Set (String, String)->State InferState Type
+  satisfy' x@(TVar _ _) cnst _ = do
+   fX <- find x
+   let (TVar y yc) = fX
+   let newTp = TVar y $ Data.Set.union yc $ Data.Set.fromList cnst
+   modify (\s->s{store = Data.Map.insert y newTp (store s)})
+   return newTp
+  satisfy' b@(TConstr _ _) [] insts = pure b
+  satisfy' b@(TConstr nm []) (x: xs) insts = if Data.Set.member (x, nm) insts then satisfy' b xs insts else error $ "No instance '"++x++"' for type '"++nm++"'."
+  -- For constructors with at least one arg, error out
+  satisfy' (TConstr _ (_:_)) _ _ = error "Can't instantiate classes for high order types."
 
 find :: Type->State InferState Type
 
@@ -72,13 +94,13 @@ find (TConstr nm args) = do
  evld <- mapM find args
  return $ TConstr nm evld
 
-find (TVar x) = do
+find (TVar x _) = do
  str <- store <$> get
  let y = fromJust $ Data.Map.lookup x str
  newY <- case y of 
-  TVar x -> pure y
+  TVar ff _ -> if ff == x then pure y else find y
   _ -> find y
- modify (\s -> s { store = insert x newY (store s) })
+ modify (\s -> s { store = Data.Map.insert x newY (store s) })
  return newY
 
 specify :: Type->Type->State InferState Type
@@ -90,23 +112,28 @@ specify a b = do
  where
   specify' :: Type->Type->State InferState Type
   specify' x@(TConstr _ _) y@(TConstr _ _) = runConstr x y (zipWithM specify')
-  specify' con@(TConstr a args) (TVar x) = do
+  specify' con@(TConstr a args) (TVar x cns) = do
+   -- This call should have no effect, just some checks.
+   satisfy con $ Data.Set.toList cns
    brgs <- replicateM (length args) newMetaVar
    res <- zipWithM specify' args brgs
    let newTp = (TConstr a res)
-   modify (\s -> s { store = insert x newTp (store s) })
+   modify (\s -> s { store = Data.Map.insert x newTp (store s) })
    return newTp
-  specify' (TVar x) b = do
+  specify' (TVar x cns) b = do
    spec <- specMap <$> get
    let matched = Data.Map.lookup x spec
-   ret <- if isJust matched then unify b (fromJust matched) else (modify (\s -> s {specMap = insert x b (specMap s)})) >> pure b
+   ret <- if isJust matched then unify b (fromJust matched) else do
+    constrainedB <- satisfy b (Data.Set.toList cns)
+    modify (\s -> s {specMap = Data.Map.insert x constrainedB (specMap s)})
+    return constrainedB
    return ret
 
 newMetaVar :: State InferState Type
 newMetaVar = do
  v <- var_count <$> get
- modify (\s -> s {store = insert v (TVar v) (store s), var_count = v + 1})
- return $ TVar v
+ modify (\s -> s {store = Data.Map.insert v (TVar v Data.Set.empty) (store s), var_count = v + 1})
+ return $ TVar v Data.Set.empty
 
 destructFun :: Type->[Type]->Type
 destructFun typ [] = typ
@@ -190,9 +217,9 @@ typePattern isArg (PatRef name) = do
  lCtx <- lContext <$> get
  gCtx <- gContext <$> get
  let ctx = if isArg then lCtx else gCtx
- if member name lCtx || member name gCtx then error ("Variable '"++name++"' already exists.") else do
+ if Data.Map.member name lCtx || Data.Map.member name gCtx then error ("Variable '"++name++"' already exists.") else do
    vr <- newMetaVar
-   if name == "_" then pure () else modify (\s -> if isArg then (s { lContext = insert name vr ctx}) else (s {gContext = insert name vr ctx}))
+   if name == "_" then pure () else modify (\s -> if isArg then (s { lContext = Data.Map.insert name vr ctx}) else (s {gContext = Data.Map.insert name vr ctx}))
    return $ TPatRef name vr
 typePattern _ (PatLit prm) = pure $ TPatLit prm $ typePrim prm
 typePattern isArg (PatConstr name args) = do
@@ -230,7 +257,6 @@ typeBindList lst = do
    foldM_ unify ptnType lstTypes
    return ()
   storeBind (BindVal name _) = do
-   -- TODO: change name from string to pattern
    pat <- typePattern False name
    return pat
   typeBody (BindVal _ body) = do
@@ -253,14 +279,20 @@ typeAction (Assign ptrn vlus) = do
  return $ TAssign uPtrn'' uVlus''
 typeAction (Print vlus) = do
  tVlus <- mapM typeVal vlus
+ -- TODO: handle strings better
  uVlus <- mapM unifyVal tVlus
  uVlus' <- mapM unifyVal uVlus
+ mapM_ (getType >=> handleShow) uVlus'
  uVlus'' <- mapM unifyVal uVlus'
  return $ TPrint uVlus''
+ where
+  handleShow x = case x of
+   TConstr "List" [TConstr "Char" []] -> pure x
+   _ ->satisfy x ["Show"]
 typeAction (Read rd) = do
  ctx <- gContext <$> get
  if Data.Map.member rd ctx then error ("Variable '"++rd++"' already exists") else do
-  modify (\s->s{ gContext = insert rd (TConstr "List" [TConstr "Char" []]) ctx })
+  modify (\s->s{ gContext = Data.Map.insert rd (TConstr "List" [TConstr "Char" []]) ctx })
   return $ TRead rd
 
 unifyPattern :: TPattern->State InferState TPattern
@@ -297,12 +329,12 @@ unifyVal (TValCall name args typ) = do
  return $ TValCall name newArgs newTyp
  where
   solve par son argTypes = do
-   modify (\s -> s {specMap = empty})
+   modify (\s -> s {specMap = mempty})
    newPar <- find par
    newSon <- find son
    specifiedFun <- specify newPar $ typeCall (argTypes++[newSon])
    let specifiedSon = destructFun specifiedFun argTypes
-   modify (\s -> s {specMap = empty})
+   modify (\s -> s {specMap = mempty})
    return $ TInst newPar specifiedSon
 unifyVal (TValConstr name args typ) = do
  uArgs <- mapM unifyVal args
@@ -331,59 +363,59 @@ typeBindGroup bds = do
 typeProgram :: Program->TProgram
 typeProgram (Program _ _ _ binds (Just actions)) = typed
  where
-  (typed, _) = runState runTypeInference initialState
+  ff@(!typed, !_) = runState runTypeInference initialState
   runTypeInference = do
    tBinds <- typeBindGroup binds
    tActions <- mapM typeAction actions
    return $ TProgram tBinds tActions
 
 initialState :: InferState
-initialState = execState (mapM checkBasicPolys (Prelude.map snd globalCtx)) $ InferState empty (fromList globalCtx) empty 0 empty
+initialState = execState (mapM checkBasicPolys (Prelude.map snd globalCtx)) $ InferState (Data.Set.fromList classes) mempty (Data.Map.fromList globalCtx) mempty 0 mempty
  where
   checkBasicPolys :: Type->State InferState Type
-  checkBasicPolys (TVar x) = do
-   modify (\s->s{store = insert x (TVar x) (store s)})
+  checkBasicPolys (TVar x cns) = do
+   modify (\s->s{store = Data.Map.insert x (TVar x cns) (store s)})
    vrc <- var_count <$> get
    if vrc <= x then modify (\s->s{var_count = x + 1}) else pure ()
-   return $ TVar x
+   return $ TVar x cns
   checkBasicPolys (TConstr name lst) = liftM (TConstr name) (mapM checkBasicPolys lst)
 
-{--
-headTyp = TConstr "TFun" [TConstr "List" [TVar 0], TVar 0]
-headCall = TConstr "TFun" [TConstr "List" [TVar 1], TVar 2]
-headStore = InferState (fromList [(0, TVar 0), (1, TVar 1), (2, TVar 2)]) empty 0 empty
-
-otrStore = InferState (fromList [(0, TVar 0), (1, TVar 1), (2, TVar 2)]) empty 0 $ fromList [(0, TVar 1)]
-otrTyp = TVar 0
-otrCall = TVar 2
-bv = BindVal (PatRef "x") [ ValLit (PInt 3) ]
-
-myCall = (ValCall "+" [ValLit $ PInt 2, ValLit $ PInt 3])
-myLamb = ValLambda ([PatRef "a", PatRef "b"], ValCall "c" []) []
---}
---vlu wh init = runState (typeVal wh) init
-
 tFun a b = TConstr "TFun" [a, b]
-tBool = TConstr "Bool" []
 tInt = TConstr "Int" []
-tDouble = TConstr "Double" []
+tBool = TConstr "Bool" []
 
 tBinArith tp = tFun tp (tFun tp tp)
-
-arithmetic = [
- ("+", tBinArith tInt),
- ("-", tBinArith tInt),
- ("*", tBinArith tInt),
- ("/", tBinArith tInt),
- ("%", tBinArith tInt),
- ("==", tFun tInt $ tFun tInt tBool),
- ("<", tFun tInt $ tFun tInt tBool),
- (">", tFun tInt $ tFun tInt tBool),
- ("<=", tFun tInt $ tFun tInt tBool),
- (">=", tFun tInt $ tFun tInt tBool)]
+tComp tp = tFun tp $ tFun tp tBool
+tString = TConstr "List" [TConstr "Char" []]
 
 basicLib = [
- ("if", tFun tBool $ tFun (TVar 0) $ tFun (TVar 0) (TVar 0)),
- ("++", tFun (TConstr "List" [TVar 1]) $ tFun (TConstr "List" [TVar 1]) (TConstr "List" [TVar 1]))]
+ ("if", tFun tBool $ tFun (TVar 0 Data.Set.empty) $ tFun (TVar 0 Data.Set.empty) (TVar 0 Data.Set.empty)),
+ ("++", tFun (TConstr "List" [TVar 1 Data.Set.empty]) $ tFun (TConstr "List" [TVar 1 Data.Set.empty]) (TConstr "List" [TVar 1 Data.Set.empty]))]
+
+arithmetic = [
+ ("+", tBinArith $ TVar 2 $ Data.Set.fromList ["Num"]),
+ ("-", tBinArith $ TVar 3 $ Data.Set.fromList ["Num"]),
+ ("*", tBinArith $ TVar 4 $ Data.Set.fromList ["Num"]),
+ ("/", tBinArith $ TVar 5 $ Data.Set.fromList ["Num"]),
+ ("%", tBinArith tInt),
+ ("==", tComp $ TVar 7 $ Data.Set.fromList ["Ord"]),
+ ("<", tComp $ TVar 8 $ Data.Set.fromList ["Ord"]),
+ (">", tComp $ TVar 9 $ Data.Set.fromList ["Ord"]),
+ ("<=", tComp $ TVar 10 $ Data.Set.fromList ["Ord"]),
+ (">=", tComp $ TVar 11 $ Data.Set.fromList ["Ord"]),
+ ("show", tFun (TVar 12 $ Data.Set.fromList ["Show"]) tString),
+ ("parseInt", tFun tString tInt),
+ ("parseDouble", tFun tString $ TConstr "Double" [])]
 
 globalCtx = arithmetic ++ basicLib
+
+classes = [
+  ("Show", "Int"),
+  ("Show", "Bool"),
+  ("Show", "Char"),
+  ("Show", "Double"),
+  ("Num", "Double"),
+  ("Num", "Int"),
+  ("Ord", "Double"),
+  ("Ord", "Int")]
+

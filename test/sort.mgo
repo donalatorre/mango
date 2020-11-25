@@ -1,3 +1,8 @@
+(let foldl
+  (\ [ _, val, [] ] val)
+	(\ [ fun, val, (Cons x xs) ] (foldl fun (fun val x) xs))
+)
+
 (let insert
 	(\ [value, []] [value])
 	(\ [value, (Cons x xs)] (if (<= value x) (Cons value (Cons x xs)) (Cons x (insert value xs))))
@@ -26,9 +31,14 @@
 	)
 )
 
+(let map
+  (\ [ _, [] ] [])
+	(\ [ fun, (Cons x xs) ] (Cons (fun x) (map fun xs)))
+)
+
 (main
-	(var x [1, 9, 5, 3, 20, 2])
+	(var x [9, 2, 8, 0])
 	(var res (qsort x))
-	(print res)
+	(print (foldl ++ "" (map (++ " ") (map show res))))
 )
 
