@@ -1,3 +1,8 @@
+{--
+  Eval.hs is the evaluator of our compiler 
+  it resolves the program and excutes all the needed actions
+  Main Module uses this module and passes the information to the evaluator
+--}
 module Eval where
 import DataTypes
 import Data.Map
@@ -69,6 +74,7 @@ handleMultiDef (DataCall (Func lsta) [] argcA: DataCall (Func lstb) [] argcB: re
  handleMultiDef (DataCall (Func $ lsta++lstb) [] argcA: rest) else error $ "Fatal error: Different number of args"
 --handleMultiDef x = error $ "x is " ++ (ppShow x)
 
+-- Resolving single binds
 resolveBind :: TBind->State ExecState ()
 resolveBind (TBindVal pat vls) = do
  vc <- exec_var_count <$> get
@@ -82,6 +88,7 @@ resolveBind (TBindVal pat vls) = do
   markPat vc (TPatConstr _ lst _) = mapM_ (markPat vc) lst
   markPat _ _ = pure ()
 
+-- Function to resolve the different Actions written in the main section
 resolveAction stt (TAssign pat vls) = pure $ execState (resolveBind (TBindVal pat vls)) stt
 
 resolveAction stt (TRead name) = do
@@ -95,6 +102,7 @@ resolveAction stt (TPrint vls) = do
  putStrLn $ toPrint
  return newStt
 
+-- function called from main to resolve the whole program
 resolveProgram (TProgram bds acts) = foldM_ resolveAction rBds acts
  where
   rBds = execState (mapM resolveBind bds) $ ExecState mempty primitiveCtx mempty Data.Set.empty 0
