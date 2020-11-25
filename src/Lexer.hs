@@ -1,3 +1,8 @@
+{--
+  Lexer.hs is the module in charge of identifying tokens and creating the AST
+  It uses the Parsec Library which hugely simplifies the parsing
+  Main is the module that uses Lexer.hs
+--}
 module Lexer (mylex) where
 import Typing
 import DataTypes
@@ -28,9 +33,17 @@ singleApply parseName parseArg = do
  many blank >> char ')'
  return $ ($body) . ($name)
 
+{-- 
+  Function that parses a repetitive structure in Mango
+  This structure is (word [values])
+  --}
 strictApply :: Parser a->Parser b->Parser ((a->[b]->c)->c)
 strictApply parseName parseArg = singleApply parseName (sepEndBy1 parseArg $ many1 blank)
 
+{-- 
+  Function that parses a repetitive structure in Mango
+  This structure is (word [values]) where list can be empty
+  --}
 flexibleApply :: Parser a->Parser b->Parser ((a->[b]->c)->c)
 flexibleApply parseName parseArg = try (singleApply parseName (sepEndBy parseArg $ many1 blank)) <|> noParen
  where
@@ -43,6 +56,7 @@ abstractList parseItem = do
  many blank >> char ']'
  return list
 
+-- Function that receives an empty Program and fills it calling the different functions to parse different valid structures 
 parseProgram :: Program->Parser Program
 parseProgram prog@(Program tdl cdl cil bl vll) = (try parseProgItem) <|> ((many blank >> eof) *> ( return prog ))
  where
@@ -70,6 +84,7 @@ parseRead = try $ liftM ($(\_ name -> Read name)) $singleApply (string "read") p
 parseAssign :: Parser Action
 parseAssign = liftM ($Assign) $ strictApply (string "var" >> many1 blank >> parsePattern) parseValue
 
+-- Function to parse Class Instances
 parseClassInst :: Parser ClassInst
 parseClassInst = liftM ($ClassInst) $ strictApply parseInstHead parseBindVal
  where
@@ -80,12 +95,14 @@ parseTypeSig :: Parser TypeSig
 parseTypeSig = (liftM ($TypeConstr) $ flexibleApply parseUpper parseTypeSig)
  <|> (liftM TypeList $ abstractList parseTypeSig) <|> (liftM TypeRef parseNonUpper)
 
+-- Function to parse type definitions
 parseTypeDef :: Parser TypeDef
 parseTypeDef = liftM ($TypeDef) $ strictApply parseTypeName parseConstrucDef
  where
   parseTypeName = liftM ($(,)) $ string "data" >> many1 blank >> flexibleApply parseUpper parseNonUpper
   parseConstrucDef = (liftM ($TypeConstr) $ flexibleApply parseUpper parseTypeSig)
 
+-- Function to parse class definitions
 parseClassDef :: Parser ClassDef
 parseClassDef = liftM ($ClassDef) $ strictApply parseHead parseFunc
  where
@@ -116,6 +133,7 @@ parseLmbHead = do
 parseBindVal :: Parser Bind
 parseBindVal = liftM ($BindVal) $ strictApply (string "let" >> many1 blank >> parsePattern) parseValue
 
+--Function to parse Binds
 parseBind :: Parser Bind
 parseBind = (try parseBindVal) <|> parseBindType
  where
@@ -152,6 +170,7 @@ parsePrim = parseString <|> parseBool <|> parseChar <|> (try parseDouble) <|> pa
 prsl :: Parser (String, [String])
 prsl = liftM ($(,)) $ flexibleApply parseUpper parseUpper
 
+-- Function called from main to trigger the parging defined in this module
 mylex :: String->(Either String Program)
 mylex input =
  case parse (many blank >> (parseProgram $ Program [] [] [] [] Nothing)) "lexer" input of
